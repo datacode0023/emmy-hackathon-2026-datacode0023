@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.DS_Store
+
+# organizer-only evaluation material
+hidden/
+hidden_full/
+expressions_hidden.py

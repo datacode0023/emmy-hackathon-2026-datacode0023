@@ -1,0 +1,49 @@
+{
+  "inputs": [
+    "x"
+  ],
+  "outputs": [
+    "div"
+  ],
+  "nodes": {
+    "x": {
+      "op": "InputOp",
+      "op_fields": {},
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "x",
+          "shape": [
+            64,
+            512
+          ],
+          "dtype": "f32"
+        }
+      ]
+    },
+    "div": {
+      "op": "KernelOp",
+      "op_fields": {
+        "body": [
+          "Tile(axes=(Axis(name='a0', extent=Dim(64), window=None), Axis(name='a1_co', extent=Dim(128), window=None)), body=(StridedLoop(axis=Axis(name='a1', extent=Dim(512), window=None), start=Var(name='a1_co'), step=Literal(value=128, dtype='int'), body=(Load(names=('in0',), input='x', index=(Var(name='a0'), Var(name='a1')), dtype=DataType(name='f32', np=dtype('float32'), nbytes=4)), Assign(name='v0', op=ElementwiseImpl('multiply'), args=('in0', 'in0'), dtype=DataType(name='f32', np=dtype('float32'), nbytes=4)), Accum(name='acc0', value='v0', op=ElementwiseImpl('add'), dtype=DataType(name='f32', np=dtype('float32'), nbytes=4), axes=('a1',), base=None)), unroll=False, end=None, seed=True), WarpShuffle(state=('acc0',), state_b=('acc0__o',), combine_states=(Assign(name='acc0', op=ElementwiseImpl('add'), args=('acc0', 'acc0__o'), dtype=None),), length=32, dtype=DataType(name='f32', np=dtype('float32'), nbytes=4)), Smem(name='acc0_smem', extents=(4,), dtype='float', align=0), Cond(cond=BinaryExpr(op='==', left=Var(name='lane'), right=Literal(value=0, dtype='int')), body=(Write(output='acc0_smem', index=(Var(name='warp'),), values=('acc0',), value_dtype=DataType(name='f32', np=dtype('float32'), nbytes=4), atomic=False, swizzle='NONE'),), else_body=()), Sync(barrier_id=0, count=None, warp=False), TreeHalve(bufs=('acc0_smem',), state=('acc0',), state_b=('acc0__o',), combine_states=(Assign(name='acc0', op=ElementwiseImpl('add'), args=('acc0', 'acc0__o'), dtype=None),), length=4, tid_var='warp', dtype=DataType(name='f32', np=dtype('float32'), nbytes=4), barrier_id=0, barrier_count=None, inner=None), Assign(name='v1', op=ElementwiseImpl('sqrt'), args=('acc0',), dtype=DataType(name='f32', np=dtype('float32'), nbytes=4)), Assign(name='v2', op=ElementwiseImpl('reciprocal'), args=('v1',), dtype=DataType(name='f32', np=dtype('float32'), nbytes=4)), StridedLoop(axis=Axis(name='a2', extent=Dim(512), window=None), start=Var(name='a1_co'), step=Literal(value=128, dtype='int'), body=(Load(names=('in1',), input='x', index=(Var(name='a0'), Var(name='a2')), dtype=DataType(name='f32', np=dtype('float32'), nbytes=4)), Assign(name='v3', op=ElementwiseImpl('multiply'), args=('in1', 'v2'), dtype=DataType(name='f32', np=dtype('float32'), nbytes=4)), Write(output='div', index=(Var(name='a0'), Var(name='a2')), values=('v3',), value_dtype=DataType(name='f32', np=dtype('float32'), nbytes=4), atomic=False, swizzle='NONE')), unroll=False, end=None, seed=True)), block_threads=128, aux_threads=0, raster_axes=None, raster_group=None, raster_orient='m')"
+        ],
+        "name": "k_div_reduce",
+        "zero_delegated": [],
+        "serial": []
+      },
+      "inputs": [
+        "x"
+      ],
+      "outputs": [
+        {
+          "name": "div",
+          "shape": [
+            64,
+            512
+          ],
+          "dtype": "f32"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,89 @@
+// Worked example: hand-written PTX for problems/r01_array_sum.
+// Contract-conformant: entry = k_sum_1_reduce, params = (x, sum_1), size 1024 baked in.
+// Launch (from meta.json): grid (1,1,1)  block (128,1,1).
+// Comments name the IR statement each section implements.
+.version 8.0
+.target sm_89
+.address_size 64
+
+.shared .align 4 .b8 acc0_smem[16];        // IR: Smem float acc0_smem[4]
+
+.visible .entry k_sum_1_reduce(
+        .param .u64 param_x,               // inputs[0]
+        .param .u64 param_sum_1            // outputs[0]
+)
+{
+        .reg .pred      %p<4>;
+        .reg .f32       %f<16>;
+        .reg .b32       %r<16>;
+        .reg .b64       %rd<8>;
+
+        ld.param.u64    %rd1, [param_x];
+        ld.param.u64    %rd2, [param_sum_1];
+        cvta.to.global.u64      %rd3, %rd1;
+        cvta.to.global.u64      %rd4, %rd2;
+        mov.u32         %r2, %tid.x;
+
+// IR: for a0 in a0_co..1024:128  (each thread strides the array)
+        mov.f32         %f1, 0f00000000;
+        mov.u32         %r4, %r2;
+LOOP:
+        setp.ge.s32     %p1, %r4, 1024;    // bound baked from the IR
+        @%p1 bra        LOOP_END;
+        mul.wide.s32    %rd5, %r4, 4;
+        add.s64         %rd6, %rd3, %rd5;
+        ld.global.f32   %f2, [%rd6];       // IR: Load
+        add.f32         %f1, %f1, %f2;     // IR: Accum
+        add.s32         %r4, %r4, 128;
+        bra             LOOP;
+LOOP_END:
+
+// IR: WarpShuffle(acc0, length=32) - butterfly at 16,8,4,2,1; shfl needs .b32
+        mov.b32         %r5, %f1;
+        shfl.sync.bfly.b32      %r6, %r5, 16, 0x1f, 0xffffffff;
+        mov.b32         %f3, %r6;
+        add.f32         %f1, %f1, %f3;
+        mov.b32         %r5, %f1;
+        shfl.sync.bfly.b32      %r6, %r5, 8, 0x1f, 0xffffffff;
+        mov.b32         %f3, %r6;
+        add.f32         %f1, %f1, %f3;
+        mov.b32         %r5, %f1;
+        shfl.sync.bfly.b32      %r6, %r5, 4, 0x1f, 0xffffffff;
+        mov.b32         %f3, %r6;
+        add.f32         %f1, %f1, %f3;
+        mov.b32         %r5, %f1;
+        shfl.sync.bfly.b32      %r6, %r5, 2, 0x1f, 0xffffffff;
+        mov.b32         %f3, %r6;
+        add.f32         %f1, %f1, %f3;
+        mov.b32         %r5, %f1;
+        shfl.sync.bfly.b32      %r6, %r5, 1, 0x1f, 0xffffffff;
+        mov.b32         %f3, %r6;
+        add.f32         %f1, %f1, %f3;
+
+// IR: if (lane == 0): acc0_smem[warp] = acc0
+        and.b32         %r7, %r2, 31;      // lane
+        shr.u32         %r8, %r2, 5;       // warp
+        setp.ne.s32     %p2, %r7, 0;
+        @%p2 bra        AFTER_STORE;
+        mov.u32         %r9, acc0_smem;
+        shl.b32         %r10, %r8, 2;
+        add.s32         %r11, %r9, %r10;
+        st.shared.f32   [%r11], %f1;
+AFTER_STORE:
+        bar.sync        0;                 // IR: Sync
+
+// IR: TreeHalve(length=4) + guarded Write - thread 0 folds the 4 warp partials
+        setp.ne.s32     %p3, %r2, 0;
+        @%p3 bra        DONE;
+        mov.u32         %r12, acc0_smem;
+        ld.shared.f32   %f4, [%r12];
+        ld.shared.f32   %f5, [%r12+4];
+        ld.shared.f32   %f6, [%r12+8];
+        ld.shared.f32   %f7, [%r12+12];
+        add.f32         %f8,  %f4, %f5;
+        add.f32         %f9,  %f6, %f7;
+        add.f32         %f10, %f8, %f9;
+        st.global.f32   [%rd4], %f10;      // IR: sum_1[] = acc0
+DONE:
+        ret;
+}
