@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""A first Kernel IR -> PTX compiler, covering p00-style f32 array addition.
+"""A first Kernel IR -> PTX compiler, covering f32 pointwise add/multiply/ReLU.
 
 Usage: python compile.py path/to/kernel.ir.json > out.ptx
 
 Emmy only loads the IR. All PTX instructions below are emitted by this file.
-Supported: one scalar 1-D Tile, integer index arithmetic, Load, add, and Write.
+Supported: one scalar 1-D Tile, integer indices, Load, add/multiply/relu, Write.
+Constant arguments are read from buffers through Load, just like other inputs.
 """
 
 from __future__ import annotations
@@ -106,11 +107,22 @@ class PTXCompiler:
             self.values.update(zip(stmt.names, registers))
         elif isinstance(stmt, Assign):
             self.require_f32(stmt.dtype)
-            if stmt.op.name != "add" or len(stmt.args) != 2:
+            # ReLU has one IR operand; add and multiply each have two.
+            instructions = {
+                "add": ("add.rn.f32", 2),
+                "multiply": ("mul.rn.f32", 2),
+                "relu": ("max.f32", 1),
+            }
+            if stmt.op.name not in instructions:
                 raise CompileError(f"Unsupported elementwise operation: {stmt.op.name}")
-            left, right = (self.values[name] for name in stmt.args)
+            instruction, arity = instructions[stmt.op.name]
+            if len(stmt.args) != arity:
+                raise CompileError(f"{stmt.op.name} requires {arity} operands")
+            operands = [self.values[name] for name in stmt.args]
+            if stmt.op.name == "relu":
+                operands.append("0f00000000")  # Exact f32 +0: relu(x) = max(x, 0).
             result = self.reg("f")
-            self.emit(f"add.rn.f32 {result}, {left}, {right};")
+            self.emit(f"{instruction} {result}, {', '.join(operands)};")
             self.values[stmt.name] = result
         elif isinstance(stmt, Write):
             self.require_f32(stmt.value_dtype)
