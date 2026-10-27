@@ -1,0 +1,101 @@
+.version 8.0
+.target sm_89
+.address_size 64
+
+.visible .entry k_mul_pointwise(
+    .param .u64 param_0,
+    .param .u64 param_1,
+    .param .u64 param_2
+)
+{
+    .reg .b32 %r<22>;
+    .reg .b64 %rd<21>;
+    .reg .f32 %f<16>;
+    .reg .pred %p<1>;
+
+    ld.param.u64 %rd0, [param_0];
+    cvta.to.global.u64 %rd0, %rd0;
+    ld.param.u64 %rd1, [param_1];
+    cvta.to.global.u64 %rd1, %rd1;
+    ld.param.u64 %rd2, [param_2];
+    cvta.to.global.u64 %rd2, %rd2;
+    // IR: Tile -- global thread id and bounds guard
+    mov.u32 %r0, %tid.x;
+    mov.u32 %r1, %ctaid.x;
+    mov.u32 %r2, %ntid.x;
+    mad.lo.u32 %r3, %r1, %r2, %r0;
+    setp.ge.u32 %p0, %r3, 512;
+    @%p0 bra DONE;
+    // IR: Load
+    mul.lo.s32 %r4, %r3, 4;
+    add.s32 %r5, %r4, 0;
+    mul.wide.s32 %rd3, %r5, 4;
+    add.u64 %rd4, %rd0, %rd3;
+    ld.global.f32 %f0, [%rd4];
+    // IR: Assign
+    max.f32 %f1, %f0, 0f00000000;
+    // IR: Load
+    mul.lo.s32 %r6, %r3, 4;
+    add.s32 %r7, %r6, 0;
+    mul.wide.s32 %rd5, %r7, 4;
+    add.u64 %rd6, %rd1, %rd5;
+    ld.global.f32 %f2, [%rd6];
+    // IR: Assign
+    mul.rn.f32 %f3, %f2, %f1;
+    // IR: Load
+    mul.lo.s32 %r8, %r3, 4;
+    add.s32 %r9, %r8, 1;
+    mul.wide.s32 %rd7, %r9, 4;
+    add.u64 %rd8, %rd0, %rd7;
+    ld.global.f32 %f4, [%rd8];
+    // IR: Assign
+    max.f32 %f5, %f4, 0f00000000;
+    // IR: Load
+    mul.lo.s32 %r10, %r3, 4;
+    add.s32 %r11, %r10, 1;
+    mul.wide.s32 %rd9, %r11, 4;
+    add.u64 %rd10, %rd1, %rd9;
+    ld.global.f32 %f6, [%rd10];
+    // IR: Assign
+    mul.rn.f32 %f7, %f6, %f5;
+    // IR: Load
+    mul.lo.s32 %r12, %r3, 4;
+    add.s32 %r13, %r12, 2;
+    mul.wide.s32 %rd11, %r13, 4;
+    add.u64 %rd12, %rd0, %rd11;
+    ld.global.f32 %f8, [%rd12];
+    // IR: Assign
+    max.f32 %f9, %f8, 0f00000000;
+    // IR: Load
+    mul.lo.s32 %r14, %r3, 4;
+    add.s32 %r15, %r14, 2;
+    mul.wide.s32 %rd13, %r15, 4;
+    add.u64 %rd14, %rd1, %rd13;
+    ld.global.f32 %f10, [%rd14];
+    // IR: Assign
+    mul.rn.f32 %f11, %f10, %f9;
+    // IR: Load
+    mul.lo.s32 %r16, %r3, 4;
+    add.s32 %r17, %r16, 3;
+    mul.wide.s32 %rd15, %r17, 4;
+    add.u64 %rd16, %rd0, %rd15;
+    ld.global.f32 %f12, [%rd16];
+    // IR: Assign
+    max.f32 %f13, %f12, 0f00000000;
+    // IR: Load
+    mul.lo.s32 %r18, %r3, 4;
+    add.s32 %r19, %r18, 3;
+    mul.wide.s32 %rd17, %r19, 4;
+    add.u64 %rd18, %rd1, %rd17;
+    ld.global.f32 %f14, [%rd18];
+    // IR: Assign
+    mul.rn.f32 %f15, %f14, %f13;
+    // IR: Write
+    mul.lo.s32 %r20, %r3, 4;
+    add.s32 %r21, %r20, 0;
+    mul.wide.s32 %rd19, %r21, 4;
+    add.u64 %rd20, %rd2, %rd19;
+    st.global.v4.f32 [%rd20], {%f3, %f7, %f11, %f15};
+DONE:
+    ret;
+}
