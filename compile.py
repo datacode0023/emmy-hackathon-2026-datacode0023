@@ -117,6 +117,7 @@ class PTXCompiler:
     def assign(self, stmt: Assign, default_dtype=None) -> None:
         # Combine programs inherit their enclosing reduction's dtype.
         self.require_f32(stmt.dtype if stmt.dtype is not None else default_dtype)
+        # validate the number of operands for each operation
         instructions = {
             "add": ("add.rn.f32", 2),
             "multiply": ("mul.rn.f32", 2),
@@ -180,7 +181,7 @@ class PTXCompiler:
                     self.values[child.name] = register
 
         start = self.index(stmt.start)
-        end = self.index(stmt.end if stmt.end is not None else stmt.axis.extent.expr)
+        end = self.index(stmt.end if stmt.end is not None else stmt.axis.extent.expr) #Tile extent comes from graph
         induction = self.reg("r")
         self.emit(f"mov.s32 {induction}, {start};")
         self.axes[stmt.axis.name] = induction
